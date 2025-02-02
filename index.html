@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モンハン企画抽選ツール</title>
+  <script src="https://magicant.github.io/sjavascript/mt.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+    }
+    button {
+      background-color: blue;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: darkblue;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid black;
+      padding: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>クエスト抽選ツール</h1>
+    <label for="host">主催者 (オプション):</label>
+    <input id="host" placeholder="主催者の名前">
+
+    <label for="participants">参加者一覧 (1行に1人ずつ記入してください):</label>
+    <textarea id="participants" placeholder="ハンターA
+ハンターB
+ハンターC"></textarea>
+
+    <label for="quests">クエスト一覧 (クエスト名[タブ]ランク(S,A,B,C,D,E,F) 形式で入力):</label>
+    <textarea id="quests" placeholder="クエスト1	A
+クエスト2	B
+クエスト3	C"></textarea>
+
+    <button onclick="drawLots()">抽選</button>
+
+    <table id="resultTable" style="display: none;">
+      <thead>
+        <tr>
+          <th>リーダー</th>
+          <th>クエスト</th>
+          <th>ランク</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const mt = new MersenneTwister();
+
+    function getRandomInt(max) {
+      return mt.nextInt(0, max);
+    }
+
+    function drawLots() {
+      const hostInput = document.getElementById('host').value.trim();
+      const participantsInput = document.getElementById('participants').value.trim();
+      const questsInput = document.getElementById('quests').value.trim();
+
+      if (!participantsInput || !questsInput) {
+        alert('参加者一覧とクエスト一覧を入力してください。');
+        return;
+      }
+
+      let participants = participantsInput.split('\n').filter(p => p.trim());
+      let quests = questsInput.split('\n').map(q => q.trim().split('\t'));
+
+      if (quests.some(q => q.length !== 2)) {
+        alert('クエスト一覧のフォーマットが正しくありません。クエスト名とランクをタブで区切ってください。');
+        return;
+      }
+
+      const rankGroups = {};
+      quests.forEach(([name, rank]) => {
+        if (!rankGroups[rank]) rankGroups[rank] = [];
+        rankGroups[rank].push([name, rank]);
+      });
+
+      const rankKeys = Object.keys(rankGroups);
+      if (rankKeys.length === 0) {
+        alert('有効なクエストが見つかりませんでした。');
+        return;
+      }
+      
+      const weightedRanks = [];
+      rankKeys.forEach(rank => {
+        for (let i = 0; i < rankGroups[rank].length; i++) {
+          weightedRanks.push(rank);
+        }
+      });
+      const selectedRank = weightedRanks[getRandomInt(weightedRanks.length)];
+      const filteredQuests = rankGroups[selectedRank];
+      
+      const leaderCount = Math.ceil(participants.length / 4);
+      const resultBody = document.getElementById('resultBody');
+      resultBody.innerHTML = '';
+      let leaders = [];
+
+      if (hostInput) {
+        leaders.push(hostInput);
+        participants = participants.filter(p => p !== hostInput);
+      }
+
+      const shuffledParticipants = participants.sort(() => mt.nextInt(0, 100) - 50);
+      while (leaders.length < leaderCount && shuffledParticipants.length > 0) {
+        leaders.push(shuffledParticipants.pop());
+      }
+
+      leaders.forEach((leader, index) => {
+        const [quest, rank] = filteredQuests[getRandomInt(filteredQuests.length)];
+        const row = document.createElement('tr');
+        const leaderCell = document.createElement('td');
+        const questCell = document.createElement('td');
+        const rankCell = document.createElement('td');
+        const actionCell = document.createElement('td');
+
+        leaderCell.textContent = leader;
+        questCell.textContent = quest;
+        rankCell.textContent = rank;
+
+        const redrawButton = document.createElement('button');
+        redrawButton.textContent = '再抽選';
+        redrawButton.onclick = function() { redrawSingleQuest(questCell, rankCell, filteredQuests); };
+        actionCell.appendChild(redrawButton);
+
+        row.appendChild(leaderCell);
+        row.appendChild(questCell);
+        row.appendChild(rankCell);
+        row.appendChild(actionCell);
+        resultBody.appendChild(row);
+      });
+
+      document.getElementById('resultTable').style.display = 'table';
+    }
+
+    function redrawSingleQuest(questCell, rankCell, availableQuests) {
+      if (!availableQuests.length) {
+        alert('クエスト一覧が空です。');
+        return;
+      }
+      const [newQuest, newRank] = availableQuests[getRandomInt(availableQuests.length)];
+      questCell.textContent = newQuest;
+      rankCell.textContent = newRank;
+    }
+  </script>
+</body>
+</html>
